@@ -1,0 +1,97 @@
+name: Gradle Build, Test and Deploy
+
+on:
+  # Allows manual trigger from the Actions tab
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to deploy'
+        required: true
+        type: string
+        default: '1.0.0'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+      
+      - name: Execute Gradle build
+        run: ./gradlew build -x test
+        
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: build/libs/*.jar
+
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+      
+      - name: Execute Gradle tests
+        run: ./gradlew test
+        
+      - name: Publish Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: build/reports/tests/
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+          
+      - name: Deploy to ${{ github.event.inputs.environment }}
+        run: |
+          echo "Deploying version ${{ github.event.inputs.version }} to ${{ github.event.inputs.environment }}"
+          # Add your deployment commands here
+          # For example:
+          # - Upload to a server
+          # - Deploy to cloud service
+          # - Update configuration
+          
+      - name: Post-deployment verification
+        run: |
+          echo "Verifying deployment..."
+          # Add verification steps here
+          
+      - name: Deployment Status
+        run: |
+          echo "Deployment to ${{ github.event.inputs.environment }} completed successfully"
